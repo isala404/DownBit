@@ -48,3 +48,6 @@ class Logger(object):
 
     def warning(self, message):
         self.log.warning(message)
+
+    def error(self, message):
+        self.log.error(message)
