@@ -3,11 +3,13 @@ import sqlite3
 import os
 import datetime
 
+logger = analyzer.Logger('DownBit', path='logs', save_log=5, log_level='Debug')
+
 
 class DownBit:
     def __init__(self):
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        self.logger = analyzer.Logger('DownBit', path='logs', save_log=5, log_level='Debug')
+        self.logger = logger
 
         # Connecting to Database
         self.conn = sqlite3.connect('database')
@@ -34,6 +36,7 @@ class DownBit:
         `track_name` INTEGER UNIQUE, `artist_name` INTEGER, `album_name` INTEGER, `image` INTEGER UNIQUE, 
         `added_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER 
         DEFAULT -1, `total_bytes` INTEGER DEFAULT -1 )''')
+
         self.c.execute('''CREATE TABLE IF NOT EXISTS `torrent_queue` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
         `name` TEXT, `source` TEXT, `magnet_link` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/', `added_time` TIMESTAMP 
         DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER DEFAULT -1, `total_bytes` 
@@ -46,8 +49,6 @@ class DownBit:
         # Commit Changes
         self.conn.commit()
 
-    # transformers | age, of, extinction
-    # 1080p | 4k, 8k
     @staticmethod
     def is_match(title, includes, excludes):
         if not includes and not excludes:
@@ -96,9 +97,24 @@ class DownBit:
             self.logger.warning("{} is a Unknown Quality setting Quality to 360p".format(quality))
             return "18"
 
-    def youtube_progress_hook(self, d):
-        if d['status'] == 'finished':
-            self.logger.info('Done downloading, now converting ...')
+    def youtube_progress_hook(self, progress, table, vid):
+        if progress['status'] == 'downloading':
+            downloaded_bytes = progress['status']['downloaded_bytes']
+            total_bytes = progress['status']['total_bytes']
+            if total_bytes is None:
+                total_bytes = progress['status']['total_bytes_estimate']
+            if table == 'youtube':
+                if total_bytes:
+                    self.c.execute("UPDATE `youtube_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
+                                   (downloaded_bytes, total_bytes, vid))
+                else:
+                    self.c.execute("UPDATE `youtube_queue` SET downloaded_bytes=? WHERE id=?",
+                                   (downloaded_bytes, vid))
+            # TODO: Update Here when Spotify plugin is Done
+
+        elif progress['status'] == 'finished':
+            self.c.execute("UPDATE `youtube_queue` SET completed_time=? WHERE id=?",
+                           (datetime.datetime.now(), vid))
 
     @staticmethod
     def date():
