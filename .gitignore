@@ -4,3 +4,4 @@ database
 __pycache__
 database-journal
 *.log
+settings.py
