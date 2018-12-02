@@ -1,4 +1,4 @@
-from plugins import youtube
+from plugins import spotify
 
-yt = youtube.Youtube()
-yt.crawler()
+sp = spotify.Spotify()
+sp.downloader()

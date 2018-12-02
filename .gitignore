@@ -5,3 +5,4 @@ __pycache__
 database-journal
 *.log
 settings.py
+*.old

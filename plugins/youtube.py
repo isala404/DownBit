@@ -4,7 +4,7 @@ import feedparser
 import os
 import datetime
 import sqlite3
-from settings import youtube_download_path
+import settings
 
 
 class Youtube:
@@ -20,14 +20,13 @@ class Youtube:
 
         self.c.execute('''CREATE TABLE IF NOT EXISTS "youtube_subscriptions" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
         `url` TEXT DEFAULT 'https://www.youtube.com/feeds/videos.xml?channel_id=' UNIQUE, `quality` TEXT DEFAULT 
-        '720p', `path` TEXT, `includes` TEXT, `excludes` TEXT, `last_match` TEXT, `mark_watched` NUMERIC DEFAULT 0, 
-        `active` NUMERIC DEFAULT 1 )''')
+        '720p', `path` TEXT, `includes` TEXT, `excludes` TEXT, `last_match` TEXT, `active` NUMERIC DEFAULT 1 )''')
 
         self.c.execute('''CREATE TABLE IF NOT EXISTS "youtube_queue" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
         `url` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/Youtube/', `quality` TEXT DEFAULT '720p', `added_time` TIMESTAMP 
         DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER DEFAULT 0, `total_bytes` 
-        INTEGER DEFAULT -1, `mark_watched` NUMERIC DEFAULT 0, `is_playlist` NUMERIC DEFAULT 0, `playlist_start` 
-        INTEGER DEFAULT 0, `playlist_end` INTEGER DEFAULT -1 )''')
+        INTEGER DEFAULT -1, `is_playlist` NUMERIC DEFAULT 0, `playlist_start` INTEGER DEFAULT 0, 
+        `playlist_end` INTEGER DEFAULT -1 )''')
 
         self.conn.commit()
 
@@ -75,7 +74,7 @@ class Youtube:
                                 file_size = data['filesize']
 
                             if not path:
-                                path = f"{youtube_download_path}{date()}"
+                                path = f"{settings.youtube_download_path}{date()}"
 
                             self.c.execute(
                                 'INSERT INTO youtube_queue(name, url, path, quality, total_bytes, '
@@ -101,7 +100,6 @@ class Youtube:
                 if not os.path.exists(path):
                     os.mkdir(path)
                 self.current_vid = vid
-                # TODO: Mark as Watched
                 ydl_opts = {
                     'format': get_quality(quality),
                     'outtmpl': f'/{path}/%(uploader)s-%(title)s[%(id)s].%(ext)s',
@@ -110,6 +108,7 @@ class Youtube:
                     'source_address': '0.0.0.0',
                     'progress_hooks': [self.youtube_progress_hook]
                 }
+
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
 
