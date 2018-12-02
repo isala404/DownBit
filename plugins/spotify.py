@@ -155,7 +155,6 @@ class Spotify:
             audio_file.tag.release_date = u"{}".format(release_date)
             audio_file.tag.images.set(3, open(dl_dir, "rb").read(), "image/jpeg", u"")
             audio_file.tag.save()
-            break
 
     def youtube_progress_hook(self, progress):
         if progress['status'] == 'downloading':
