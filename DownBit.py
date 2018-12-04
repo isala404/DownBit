@@ -1,3 +1,4 @@
+import re
 import analyzer
 import sqlite3
 import os
@@ -86,3 +87,12 @@ def get_quality(quality):
 def date():
     now = datetime.datetime.now()
     return '{}-{}-{}'.format(now.year, now.month, now.day)
+
+
+def safe_filename(name):
+    name = name.replace('"', '')
+    name = name.replace('/', '')
+    name = name.replace('\\', '')
+    name = name.replace("'", '')
+    name = name.encode('ascii', errors='ignore').decode()
+    return re.sub(' +', ' ', name)
