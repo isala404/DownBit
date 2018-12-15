@@ -6,8 +6,10 @@ import datetime
 import sqlite3
 import settings
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
 
 class Youtube:
 
@@ -33,89 +35,99 @@ class Youtube:
         self.conn.commit()
 
     def crawler(self):
-        try:
-            self.c.execute("SELECT * FROM youtube_subscriptions")
-            for vid, name, url, quality, path, includes, excludes, last_match, active in self.c.fetchall():
-                try:
-                    if not active:
-                        logger.debug("Skipping #{} {}".format(vid, name.strip()))
-                        continue
-                    logger.debug("Processing #{} {}".format(vid, name.strip()))
-                    rss = feedparser.parse(url)
-                    i = -1
-                    for i, entry in enumerate(rss['entries']):
-                        if entry['link'] == last_match:
-                            break
-
-                    if i > 6 and last_match is not None:
-                        i = 0
-
-                    for y in range(i, -1, -1):
-                        if rss['entries'][y]['link'] == last_match:
+        while True:
+            try:
+                self.c.execute("SELECT * FROM youtube_subscriptions")
+                for vid, name, url, quality, path, includes, excludes, last_match, active in self.c.fetchall():
+                    try:
+                        if not active:
+                            logger.debug("Skipping #{} {}".format(vid, name.strip()))
                             continue
+                        logger.debug("Processing #{} {}".format(vid, name.strip()))
+                        rss = feedparser.parse(url)
+                        i = -1
+                        for i, entry in enumerate(rss['entries']):
+                            if entry['link'] == last_match:
+                                break
 
-                        if is_match(rss['entries'][y]['title'], includes, excludes):
-                            ydl_opts = {
-                                'format': get_quality(quality),
-                                'outtmpl': '/tmp/%(extractor)s-%(id)s-%(title)s.%(ext)s',
-                                'source_address': '0.0.0.0',
-                                'ignoreerrors': True,
-                                'logtostderr': False,
-                                'quiet': True,
-                                'no_warnings': True,
-                                'noprogress': True
-                            }
-                            file_size = 0
-                            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                                data = ydl.extract_info(rss['entries'][y]['link'], download=False)
+                        if i > 6 and last_match is not None:
+                            i = 0
 
-                            if 'filesize' not in data and 'requested_formats' in data:
-                                for i in data['requested_formats']:
-                                    if 'filesize' in i:
-                                        file_size += i['filesize']
-                            else:
-                                file_size = data['filesize']
+                        for y in range(i, -1, -1):
+                            if rss['entries'][y]['link'] == last_match:
+                                continue
 
-                            if not path:
-                                path = "{}{}".format(settings.youtube_download_path, date())
+                            if is_match(rss['entries'][y]['title'], includes, excludes):
+                                ydl_opts = {
+                                    'format': get_quality(quality),
+                                    'outtmpl': '/tmp/%(extractor)s-%(id)s-%(title)s.%(ext)s',
+                                    'source_address': '0.0.0.0',
+                                    'ignoreerrors': True,
+                                    'logtostderr': False,
+                                    'quiet': True,
+                                    'no_warnings': True,
+                                    'noprogress': True
+                                }
+                                file_size = 0
+                                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                                    data = ydl.extract_info(rss['entries'][y]['link'], download=False)
 
-                            self.c.execute(
-                                'INSERT INTO youtube_queue(name, url, path, quality, total_bytes) VALUES(?, ?, ?, ?, ?)',
-                                (rss['entries'][y]['title'], rss['entries'][y]['link'], path, quality, file_size))
+                                if 'filesize' not in data and 'requested_formats' in data:
+                                    for i in data['requested_formats']:
+                                        if 'filesize' in i:
+                                            file_size += i['filesize']
+                                else:
+                                    file_size = data['filesize']
 
-                            self.c.execute('UPDATE youtube_subscriptions SET last_match = ? WHERE ID = ?',
-                                           (rss['entries'][y]['link'], vid))
-                            self.conn.commit()
+                                if not path:
+                                    path = "{}{}".format(settings.youtube_download_path, date())
 
-                except Exception as e:
-                    logger.error("Error while Processing RSS feed of {}[{}]".format(url, vid))
-                    logger.exception(e)
+                                self.c.execute(
+                                    'INSERT INTO youtube_queue(name, url, path, quality, total_bytes) VALUES(?, ?, ?, ?, ?)',
+                                    (rss['entries'][y]['title'], rss['entries'][y]['link'], path, quality, file_size))
 
-        except Exception as e:
-            logger.error("Error in youtube crawler")
-            logger.exception(e)
+                                self.c.execute('UPDATE youtube_subscriptions SET last_match = ? WHERE ID = ?',
+                                               (rss['entries'][y]['link'], vid))
+                                self.conn.commit()
+
+                    except Exception as e:
+                        logger.error("Error while Processing RSS feed of {}[{}]".format(url, vid))
+                        logger.exception(e)
+
+            except Exception as e:
+                logger.error("Error in youtube crawler")
+                logger.exception(e)
+
+            time.sleep(settings.crawler_time_out)
 
     def downloader(self):
-        self.c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue")
-        for vid, name, url, quality, path, is_playlist in self.c.fetchall():
-            self.current_vid = vid
-            if not is_playlist:
-                if not os.path.exists(path):
-                    os.mkdir(path)
-                self.current_vid = vid
-                ydl_opts = {
-                    'format': get_quality(quality),
-                    'outtmpl': '{}/%(uploader)s-%(title)s[%(id)s].%(ext)s'.format(path.rstrip('/')),
-                    'logger': logger,
-                    'continuedl': True,
-                    'source_address': '0.0.0.0',
-                    'progress_hooks': [self.youtube_progress_hook],
-                    'noprogress': True
-                }
+        while True:
+            if not is_downloading_time():
+                time.sleep(2)
+                continue
 
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-            # TODO: Handle for Playlist
+            self.c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue")
+            for vid, name, url, quality, path, is_playlist in self.c.fetchall():
+                self.current_vid = vid
+                if not is_playlist:
+                    if not os.path.exists(path):
+                        os.mkdir(path)
+                    self.current_vid = vid
+                    ydl_opts = {
+                        'format': get_quality(quality),
+                        'outtmpl': '{}/%(uploader)s-%(title)s[%(id)s].%(ext)s'.format(path.rstrip('/')),
+                        'logger': logger,
+                        'continuedl': True,
+                        'source_address': '0.0.0.0',
+                        'progress_hooks': [self.youtube_progress_hook],
+                        'noprogress': True
+                    }
+
+                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
+                # TODO: Handle for Playlist
+
+            time.sleep(settings.downloader_time_out)
 
     def youtube_progress_hook(self, progress):
         if progress['status'] == 'downloading':

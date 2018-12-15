@@ -6,6 +6,8 @@ import eyed3
 from urllib.request import urlretrieve as download
 from settings import spotify_token, song_download_path
 import logging
+import time
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,26 +31,29 @@ class Spotify:
         self.current_vid = None
 
     def crawler(self):
-        try:
-            self.c.execute("SELECT track_id FROM spotify_queue ORDER BY id DESC LIMIT 1")
-            offset = self.c.fetchall()
+        while True:
+            try:
+                self.c.execute("SELECT track_id FROM spotify_queue ORDER BY id DESC LIMIT 1")
+                offset = self.c.fetchall()
 
-            if not spotify_token:
-                logger.warning("Spotify Token is Empty, Fill the Token to Continue")
-                return False
+                if not spotify_token:
+                    logger.warning("Spotify Token is Empty, Fill the Token to Continue")
+                    return False
 
-            sp = spotipy.Spotify(auth=spotify_token)
-            results = sp.current_user_saved_tracks()
+                sp = spotipy.Spotify(auth=spotify_token)
+                results = sp.current_user_saved_tracks()
 
-            while True:
-                feedback = self.update_table(results, offset)
-                if not results['next'] or not feedback:
-                    break
-                results = sp.next(results)
+                while True:
+                    feedback = self.update_table(results, offset)
+                    if not results['next'] or not feedback:
+                        break
+                    results = sp.next(results)
 
-        except Exception as e:
-            logger.critical("Critical Error While Phrasing Spotify Feed")
-            logger.exception(e)
+            except Exception as e:
+                logger.critical("Critical Error While Phrasing Spotify Feed")
+                logger.exception(e)
+
+            time.sleep(settings.crawler_time_out)
 
     def update_table(self, tracks, offset):
 
@@ -103,68 +108,75 @@ class Spotify:
         return True
 
     def downloader(self):
-        if not os.path.exists(song_download_path):
-            os.makedirs(song_download_path)
-        self.c.execute(
-            "SELECT id, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date FROM spotify_queue WHERE completed_time IS NULL ")
-        for vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date in self.c.fetchall():
-            try:
-                self.current_vid = vid
-                # noinspection SpellCheckingInspection
-                ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                    }],
-                    'outtmpl': '{}{} - {} [%(id)s].%(ext)s'.format(song_download_path,
-                                                                   safe_filename(artist_name.split(",")[0]),
-                                                                   safe_filename(track_name)),
-                    'continuedl': True,
-                    'logger': logger,
-                    'progress_hooks': [self.youtube_progress_hook],
-                    'default_search': 'auto',
-                    'noplaylist': True,
-                    'source_address': '0.0.0.0',
-                    'noprogress': True
-                }
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    data = ydl.extract_info(url)
-                    path = ydl.prepare_filename(data)
+        while True:
+            if not is_downloading_time():
+                time.sleep(2)
+                continue
 
-                if not os.path.exists(path):
-                    path = '.'.join(path.split('.')[:-1]) + '.mp3'
-                if not os.path.exists(path):
-                    path = '.'.join(path.split('.')[:-1]) + '.acc'
-                if not os.path.exists(path):
-                    path = '.'.join(path.split('.')[:-1]) + '.wav'
+            if not os.path.exists(song_download_path):
+                os.makedirs(song_download_path)
+            self.c.execute(
+                "SELECT id, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date FROM spotify_queue WHERE completed_time IS NULL ")
+            for vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date in self.c.fetchall():
+                try:
+                    self.current_vid = vid
+                    # noinspection SpellCheckingInspection
+                    ydl_opts = {
+                        'format': 'bestaudio/best',
+                        'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                        }],
+                        'outtmpl': '{}{} - {} [%(id)s].%(ext)s'.format(song_download_path,
+                                                                       safe_filename(artist_name.split(",")[0]),
+                                                                       safe_filename(track_name)),
+                        'continuedl': True,
+                        'logger': logger,
+                        'progress_hooks': [self.youtube_progress_hook],
+                        'default_search': 'auto',
+                        'noplaylist': True,
+                        'source_address': '0.0.0.0',
+                        'noprogress': True
+                    }
+                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                        data = ydl.extract_info(url)
+                        path = ydl.prepare_filename(data)
 
-                if not os.path.exists(path):
-                    logger.error('Audio File was not found')
+                    if not os.path.exists(path):
+                        path = '.'.join(path.split('.')[:-1]) + '.mp3'
+                    if not os.path.exists(path):
+                        path = '.'.join(path.split('.')[:-1]) + '.acc'
+                    if not os.path.exists(path):
+                        path = '.'.join(path.split('.')[:-1]) + '.wav'
+
+                    if not os.path.exists(path):
+                        logger.error('Audio File was not found')
+                        logger.error(
+                            '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name,
+                                                                        album_artist, image, url, album_artist,
+                                                                        release_date))
+                        continue
+
+                    dl_dir = "/tmp/{}-{}.jpg".format(safe_filename(track_name), safe_filename(artist_name))
+                    download(image, dl_dir)
+                    audio_file = eyed3.load(path)
+                    audio_file.tag.artist = u"{}".format(artist_name)
+                    audio_file.tag.album = u"{}".format(album_name)
+                    audio_file.tag.album_artist = u"{}".format(album_artist)
+                    audio_file.tag.title = u"{}".format(track_name)
+                    audio_file.tag.release_date = u"{}".format(release_date)
+                    audio_file.tag.images.set(3, open(dl_dir, "rb").read(), "image/jpeg", u"")
+                    audio_file.tag.save()
+                except Exception as e:
+                    logger.error("Error While Downloading a song")
                     logger.error(
-                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name,
-                                                                    album_artist, image, url, album_artist,
-                                                                    release_date))
-                    continue
+                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name, album_artist,
+                                                                    image, url, album_artist, release_date))
+                    self.c.execute("UPDATE `spotify_queue` SET completed_time=null WHERE id=?", (self.current_vid,))
+                    self.conn.commit()
+                    logger.exception(e)
 
-                dl_dir = "/tmp/{}-{}.jpg".format(safe_filename(track_name), safe_filename(artist_name))
-                download(image, dl_dir)
-                audio_file = eyed3.load(path)
-                audio_file.tag.artist = u"{}".format(artist_name)
-                audio_file.tag.album = u"{}".format(album_name)
-                audio_file.tag.album_artist = u"{}".format(album_artist)
-                audio_file.tag.title = u"{}".format(track_name)
-                audio_file.tag.release_date = u"{}".format(release_date)
-                audio_file.tag.images.set(3, open(dl_dir, "rb").read(), "image/jpeg", u"")
-                audio_file.tag.save()
-            except Exception as e:
-                logger.error("Error While Downloading a song")
-                logger.error(
-                    '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name, album_artist,
-                                                                image, url, album_artist, release_date))
-                self.c.execute("UPDATE `spotify_queue` SET completed_time=null WHERE id=?", (self.current_vid,))
-                self.conn.commit()
-                logger.exception(e)
+                time.sleep(settings.downloader_time_out)
 
     def youtube_progress_hook(self, progress):
         if progress['status'] == 'downloading':

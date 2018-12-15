@@ -4,6 +4,7 @@ import os
 import sqlite3
 import settings
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -27,38 +28,44 @@ class ShowRSS:
         self.conn.commit()
 
     def crawler(self):
-        try:
-            self.c.execute("SELECT * FROM showrss_subscriptions")
-            rss = feedparser.parse(settings.showrss_url)
-            for vid, name, path, includes, excludes, last_match, active in self.c.fetchall():
-                try:
-                    if not active:
-                        logger.debug("Skipping #{} {}".format(vid, name.strip()))
-                        continue
-                    logger.debug("Processing #{} {}".format(vid, name.strip()))
-
-                    i = -1
-                    for i, entry in enumerate(rss['entries']):
-                        if entry['link'] == last_match:
-                            break
-
-                    for y in range(i, -1, -1):
-                        if rss['entries'][y]['link'] == last_match:
+        while True:
+            try:
+                self.c.execute("SELECT * FROM showrss_subscriptions")
+                rss = feedparser.parse(settings.showrss_url)
+                for vid, name, path, includes, excludes, last_match, active in self.c.fetchall():
+                    try:
+                        if not active:
+                            logger.debug("Skipping #{} {}".format(vid, name.strip()))
                             continue
+                        logger.debug("Processing #{} {}".format(vid, name.strip()))
 
-                        if is_match(rss['entries'][y]['title'], includes, excludes):
-                            self.c.execute(
-                                'INSERT INTO torrent_queue(name, url, path) VALUES(?, ?, ?)',
-                                (rss['entries'][y]['title'], rss['entries'][y]['link'], path))
+                        i = -1
+                        for i, entry in enumerate(rss['entries']):
+                            if entry['link'] == last_match:
+                                break
 
-                            self.c.execute('UPDATE showrss_subscriptions SET last_match = ? WHERE ID = ?',
-                                           (rss['entries'][y]['link'], vid))
-                            self.conn.commit()
+                        for y in range(i, -1, -1):
+                            if rss['entries'][y]['link'] == last_match:
+                                continue
 
-                except Exception as e:
-                    logger.error("Error while Processing RSS feed of {}[{}]".format(name, vid))
-                    logger.exception(e)
+                            if is_match(rss['entries'][y]['title'], includes, excludes):
+                                self.c.execute(
+                                    'INSERT INTO torrent_queue(name, url, path) VALUES(?, ?, ?)',
+                                    (rss['entries'][y]['title'], rss['entries'][y]['link'], path))
 
-        except Exception as e:
-            logger.error("Error in showRSS crawler")
-            logger.exception(e)
+                                self.c.execute('UPDATE showrss_subscriptions SET last_match = ? WHERE ID = ?',
+                                               (rss['entries'][y]['link'], vid))
+                                self.conn.commit()
+
+                    except Exception as e:
+                        logger.error("Error while Processing RSS feed of {}[{}]".format(name, vid))
+                        logger.exception(e)
+
+            except Exception as e:
+                logger.error("Error in showRSS crawler")
+                logger.exception(e)
+
+            time.sleep(settings.crawler_time_out)
+
+    def downloader(self):
+        pass

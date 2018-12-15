@@ -2,6 +2,8 @@ from DownBit import *
 import os
 import sqlite3
 import logging
+import time
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,32 +23,44 @@ class Torrent:
         self.conn.commit()
 
     def crawler(self):
-        self.c.execute("SELECT id,url FROM torrent_queue")
-        for tid, link in self.c.fetchall():
-            torrent_id = re.search(r'\b([A-F\d]+)\b', link).group()
-            data = shell_exe('deluge-console info').strip().split('\n')
+        while True:
+            self.c.execute("SELECT id,url FROM torrent_queue")
+            for tid, link in self.c.fetchall():
+                torrent_id = re.search(r'\b([A-F\d]+)\b', link).group()
+                data = shell_exe('deluge-console info').strip().split('\n')
 
-            for idx, info in enumerate(data):
-                if 'ID: ' in info:
-                    if torrent_id == info.strip('ID: '):
-                        torrent_state = data[idx + 1].strip('State: ')
-                        downloaded_size = round(int(data[idx + 1].strip(' ')[1]) * 1048576)
-                        total_size = round(int(data[idx + 1].strip(' ')[2].strip('MiB/')) * 1048576)
+                for idx, info in enumerate(data):
+                    if 'ID: ' in info:
+                        if torrent_id == info.strip('ID: '):
+                            torrent_state = data[idx + 1].strip('State: ')
+                            downloaded_size = round(int(data[idx + 1].strip(' ')[1]) * 1048576)
+                            total_size = round(int(data[idx + 1].strip(' ')[2].strip('MiB/')) * 1048576)
 
-                        self.c.execute(
-                            'UPDATE torrent_queue SET state = ?, downloaded_bytes = ?, total_bytes = ? WHERE ID = ?',
-                            (torrent_state, downloaded_size, total_size, tid))
-                        self.conn.commit()
-                        break
+                            self.c.execute(
+                                'UPDATE torrent_queue SET state = ?, downloaded_bytes = ?, total_bytes = ? WHERE ID = ?',
+                                (torrent_state, downloaded_size, total_size, tid))
+                            self.conn.commit()
+                            break
+            if is_downloading_time():
+                time.sleep(1)
+            else:
+                time.sleep(settings.crawler_time_out)
 
     def downloader(self):
-        self.c.execute("SELECT id, name, url, path FROM torrent_queue")
-        for id, name, url, path in self.c.fetchall():
-            data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
+        while True:
+            if not is_downloading_time():
+                time.sleep(2)
+                continue
 
-            if data == 'Torrent added!\n':
-                self.c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
-                               (datetime.datetime.now(), id))
-                self.conn.commit()
-            else:
-                logger.error("couldn't add the {}[#{}] to deluge".format(name, id))
+                self.c.execute("SELECT id, name, url, path FROM torrent_queue")
+                for id, name, url, path in self.c.fetchall():
+                    data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
+
+                    if data == 'Torrent added!\n':
+                        self.c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
+                                       (datetime.datetime.now(), id))
+                        self.conn.commit()
+                    else:
+                        logger.error("couldn't add the {}[#{}] to deluge".format(name, id))
+
+                time.sleep(settings.downloader_time_out)

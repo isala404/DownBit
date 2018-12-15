@@ -1,8 +1,7 @@
 import re
 import datetime
-import logging
 import os
-from logging.handlers import RotatingFileHandler
+import logging.handlers
 import logging
 
 logger = logging.getLogger(__name__)
@@ -105,7 +104,7 @@ def create_logger(name, path='logs', save_log=0, log_level='Debug'):
     else:
         log.setLevel(20)
 
-    file_handler = RotatingFileHandler(file_name, backupCount=save_log)
+    file_handler = logging.handlers.RotatingFileHandler(file_name, backupCount=save_log)
 
     file_handler.setFormatter(formatter)
     log.addHandler(file_handler)
@@ -113,3 +112,7 @@ def create_logger(name, path='logs', save_log=0, log_level='Debug'):
     console_handler.setFormatter(formatter)
     log.addHandler(console_handler)
     return log
+
+
+def is_downloading_time():
+    return True
