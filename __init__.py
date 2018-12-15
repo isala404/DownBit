@@ -1,4 +1,8 @@
-from plugins import youtube
+from DownBit import create_logger
 
-sp = youtube.Youtube()
+from plugins import showrss
+
+logger = create_logger('DownBit', path='logs', save_log=5, log_level='Debug')
+
+sp = showrss.ShowRSS()
 sp.crawler()

@@ -1,38 +1,11 @@
 import re
-import analyzer
-import sqlite3
-import os
 import datetime
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+import logging
 
-logger = analyzer.Logger('DownBit', path='logs', save_log=5, log_level='Debug')
-
-
-class DownBit:
-
-    def __init__(self):
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-        # Connecting to Database
-        self.conn = sqlite3.connect('database')
-        self.c = self.conn.cursor()
-
-        # Create Tables for Plugins supported by default if they are not present
-
-        self.c.execute('''CREATE TABLE IF NOT EXISTS `showrss_subscription` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
-        `name` TEXT, `url` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/Movies/', `quality` TEXT DEFAULT '720p', 
-        `includes` TEXT, `excludes` TEXT, `active` NUMERIC DEFAULT 1 )''')
-
-        self.c.execute('''CREATE TABLE IF NOT EXISTS `torrent_queue` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
-        `name` TEXT, `source` TEXT, `magnet_link` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/', `added_time` TIMESTAMP 
-        DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER DEFAULT -1, `total_bytes` 
-        INTEGER DEFAULT -1 )''')
-
-        self.c.execute('''CREATE TABLE IF NOT EXISTS "yts_subscription" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
-        `name` TEXT, `url` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/Movies/', `quality` TEXT DEFAULT '720p', 
-        `includes` TEXT, `excludes` TEXT, `active` NUMERIC DEFAULT 1 )''')
-
-        # Commit Changes
-        self.conn.commit()
+logger = logging.getLogger(__name__)
 
 
 def is_match(title, includes, excludes):
@@ -96,3 +69,47 @@ def safe_filename(name):
     name = name.replace("'", '')
     name = name.encode('ascii', errors='ignore').decode()
     return re.sub(' +', ' ', name)
+
+
+def shell_exe(cmd):
+    logger.debug('executing cmd - ' + cmd)
+    try:
+        f = os.popen(cmd)
+        out = f.read()
+        for line in out.split("\n"):
+            logger.debug("output " + line)
+        return out
+    except Exception as e:
+        logger.exception(e)
+
+
+def create_logger(name, path='logs', save_log=0, log_level='Debug'):
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    file_name = os.path.join(path, '{}.log'.format(name))
+
+    formatter = logging.Formatter(
+        fmt='%(asctime)-10s %(levelname)-10s: %(module)s:%(lineno)-d -  %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S')
+
+    log = logging.getLogger()
+    if log_level.lower() == 'critical':
+        log.setLevel(50)
+    elif log_level.lower() == 'debug':
+        log.setLevel(10)
+    elif log_level.lower() == 'error':
+        log.setLevel(40)
+    elif log_level.lower() == 'warning':
+        log.setLevel(30)
+    else:
+        log.setLevel(20)
+
+    file_handler = RotatingFileHandler(file_name, backupCount=save_log)
+
+    file_handler.setFormatter(formatter)
+    log.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    log.addHandler(console_handler)
+    return log

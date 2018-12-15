@@ -5,6 +5,9 @@ import sqlite3
 import eyed3
 from urllib.request import urlretrieve as download
 from settings import spotify_token, song_download_path
+import logging
+
+logger = logging.getLogger(__name__)
 
 eyed3.log.setLevel("ERROR")
 
@@ -55,6 +58,7 @@ class Spotify:
                 if track['id'] == offset[0][0] or track['id'] == offset[-1][0]:
                     return False
 
+            # noinspection SpellCheckingInspection
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'default_search': 'auto',
@@ -77,20 +81,22 @@ class Spotify:
                 if 'filesize' in data['entries'][0]:
                     file_size = data['entries'][0]['filesize']
 
+                self.c.execute('''INSERT INTO spotify_queue(track_id, track_name, artist_name, album_name,
+                 album_artist, image, url, release_date, total_bytes) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                               (track['id'],
+                                track['name'],
+                                track['artists'][0]['name'],
+                                track['album']['name'],
+                                track['album']['artists'][0]['name'],
+                                track['album']['images'][0]['url'],
+                                data['entries'][0]['webpage_url'],
+                                track['album']['release_date'],
+                                file_size))
 
-                self.c.execute('''INSERT INTO spotify_queue(track_id, track_name, artist_name, album_name, album_artist, image, url,
-                release_date, total_bytes) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)''', (track['id'],
-                                                                                  track['name'],
-                                                                                  track['artists'][0]['name'],
-                                                                                  track['album']['name'],
-                                                                                  track['album']['artists'][0]['name'],
-                                                                                  track['album']['images'][0]['url'],
-                                                                                  data['entries'][0]['webpage_url'],
-                                                                                  track['album']['release_date'],
-                                                                                  file_size))
                 self.conn.commit()
             except Exception as e:
-                logger.error("Error While Crawling for '{} {} audio'".format(track['artists'][0]['name'], track['name']))
+                logger.error(
+                    "Error While Crawling for '{} {} audio'".format(track['artists'][0]['name'], track['name']))
                 logger.exception(e)
                 continue
 
@@ -104,13 +110,16 @@ class Spotify:
         for vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date in self.c.fetchall():
             try:
                 self.current_vid = vid
+                # noinspection SpellCheckingInspection
                 ydl_opts = {
                     'format': 'bestaudio/best',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',
                         'preferredcodec': 'mp3',
                     }],
-                    'outtmpl': '{}{} - {} [%(id)s].%(ext)s'.format(song_download_path, safe_filename(artist_name.split(",")[0]), safe_filename(track_name)),
+                    'outtmpl': '{}{} - {} [%(id)s].%(ext)s'.format(song_download_path,
+                                                                   safe_filename(artist_name.split(",")[0]),
+                                                                   safe_filename(track_name)),
                     'continuedl': True,
                     'logger': logger,
                     'progress_hooks': [self.youtube_progress_hook],
@@ -133,7 +142,9 @@ class Spotify:
                 if not os.path.exists(path):
                     logger.error('Audio File was not found')
                     logger.error(
-                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date))
+                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name,
+                                                                    album_artist, image, url, album_artist,
+                                                                    release_date))
                     continue
 
                 dl_dir = "/tmp/{}-{}.jpg".format(safe_filename(track_name), safe_filename(artist_name))

@@ -5,7 +5,9 @@ import os
 import datetime
 import sqlite3
 import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class Youtube:
 
@@ -52,7 +54,7 @@ class Youtube:
                         if rss['entries'][y]['link'] == last_match:
                             continue
 
-                        if is_match(name, includes, excludes):
+                        if is_match(rss['entries'][y]['title'], includes, excludes):
                             ydl_opts = {
                                 'format': get_quality(quality),
                                 'outtmpl': '/tmp/%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -90,7 +92,7 @@ class Youtube:
                     logger.exception(e)
 
         except Exception as e:
-            logger.error("Error in crawler")
+            logger.error("Error in youtube crawler")
             logger.exception(e)
 
     def downloader(self):
