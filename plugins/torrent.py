@@ -13,7 +13,7 @@ class Torrent:
         logger.info("Torrent Plugin : Loaded")
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         # Connecting to Database
-        self.conn = sqlite3.connect('../database')
+        self.conn = sqlite3.connect('../database', check_same_thread=False)
         self.c = self.conn.cursor()
         self.current_vid = None
 
