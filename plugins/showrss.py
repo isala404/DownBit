@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ShowRSS:
     def __init__(self):
+        logger.info("ShowRSS Plugin : Loaded")
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         # Connecting to Database
         self.conn = sqlite3.connect('../database')
@@ -28,6 +29,7 @@ class ShowRSS:
         self.conn.commit()
 
     def crawler(self):
+        logger.info("ShowRSS Plugin : Crawler Started")
         while True:
             try:
                 self.c.execute("SELECT * FROM showrss_subscriptions")

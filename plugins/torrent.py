@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Torrent:
     def __init__(self):
+        logger.info("Torrent Plugin : Loaded")
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         # Connecting to Database
         self.conn = sqlite3.connect('../database')
@@ -23,6 +24,7 @@ class Torrent:
         self.conn.commit()
 
     def crawler(self):
+        logger.info("Torrent Plugin : Crawler Started")
         while True:
             self.c.execute("SELECT id,url FROM torrent_queue")
             for tid, link in self.c.fetchall():
@@ -47,6 +49,7 @@ class Torrent:
                 time.sleep(settings.crawler_time_out)
 
     def downloader(self):
+        logger.info("Youtube Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)

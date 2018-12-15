@@ -16,6 +16,7 @@ eyed3.log.setLevel("ERROR")
 
 class Spotify:
     def __init__(self):
+        logger.info("Spotify Plugin : Loaded")
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         # Connecting to Database
         self.conn = sqlite3.connect('../database')
@@ -31,6 +32,7 @@ class Spotify:
         self.current_vid = None
 
     def crawler(self):
+        logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
                 self.c.execute("SELECT track_id FROM spotify_queue ORDER BY id DESC LIMIT 1")
@@ -108,6 +110,7 @@ class Spotify:
         return True
 
     def downloader(self):
+        logger.info("Spotify Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)
