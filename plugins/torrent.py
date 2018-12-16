@@ -100,7 +100,7 @@ class Torrent:
 
     def downloader(self):
         c = self.conn.cursor()
-        logger.info("Youtube Plugin : Downloader Started")
+        logger.info("Torrent Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)

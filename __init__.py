@@ -43,10 +43,9 @@ for plugin in plugins:
     except Exception as e:
         logger.exception(e)
 
-if not is_downloading_time:
+if not is_downloading_time():
     logger.info("All the Downloaders are Paused till the Downloading Hours")
-else:
-    logger.info("All the Downloaders are Running")
+
 
 while True:
     try:
