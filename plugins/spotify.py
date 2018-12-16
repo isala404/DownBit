@@ -36,8 +36,6 @@ class Spotify:
         logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
-                c.execute("SELECT track_id FROM spotify_queue")
-                offset = c.fetchall()
 
                 if not spotify_token:
                     logger.warning("Spotify Token is Empty, Fill the Token to Continue")
@@ -47,7 +45,7 @@ class Spotify:
                 results = sp.current_user_saved_tracks()
 
                 while True:
-                    feedback = self.update_table(results, offset)
+                    feedback = self.update_table(results)
                     if not results['next'] or not feedback:
                         logger.info("Spotify Plugin : Database is Up to Date Exiting Crawler")
                         return False
@@ -59,14 +57,14 @@ class Spotify:
 
             time.sleep(settings.crawler_time_out)
 
-    def update_table(self, tracks, offset):
+    def update_table(self, tracks):
         c = self.conn.cursor()
         for item in tracks['items']:
             track = item['track']
+            c.execute("SELECT id FROM spotify_queue WHERE track_id = ?", (track['id'],))
+            offset = c.fetchall()
             if offset:
-                # logger.debug("{}, {}, {}".format(track['id'], offset[0][0], offset[-1][0]))
-                if track['id'] == offset[0][0] or track['id'] == offset[-1][0]:
-                    return False
+                return False
 
             # noinspection SpellCheckingInspection
             ydl_opts = {
