@@ -104,7 +104,7 @@ class Spotify:
                 self.conn.commit()
             except Exception as e:
                 logger.error(
-                    "Error While Crawling for '{} {} audio'".format(track['artists'][0]['name'], track['name']))
+                    "Error While Crawling for '{} {} lyrics'".format(track['artists'][0]['name'], track['name']))
                 logger.exception(e)
                 continue
 
