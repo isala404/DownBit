@@ -16,26 +16,27 @@ class Torrent:
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         # Connecting to Database
         self.conn = sqlite3.connect('../database.db', check_same_thread=False)
-        self.c = self.conn.cursor()
+        c = self.conn.cursor()
         self.current_vid = None
 
         # Create Tables for Plugins supported by default if they are not present
-        self.c.execute(
+        c.execute(
             '''CREATE TABLE IF NOT EXISTS `torrent_subscriptions` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, `url` TEXT, `path` TEXT DEFAULT '/mnt/', `includes` TEXT, `excludes` TEXT, `last_match` TEXT, `active` NUMERIC DEFAULT 1 );''')
 
-        self.c.execute(
+        c.execute(
             '''CREATE TABLE IF NOT EXISTS `torrent_queue` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, `url` TEXT UNIQUE, `state` TEXT, `path` TEXT, `added_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER DEFAULT 0, `total_bytes` INTEGER DEFAULT -1 );''')
 
         self.conn.commit()
 
     def crawler(self):
+        c = self.conn.cursor()
         logger.info("Torrent Plugin : Crawler Started")
         deluge_crawler = threading.Thread(target=self.deluge_crawler)
         deluge_crawler.start()
         while True:
             try:
-                self.c.execute("SELECT * FROM torrent_subscriptions")
-                for vid, name, url, path, includes, excludes, last_match, active in self.c.fetchall():
+                c.execute("SELECT * FROM torrent_subscriptions")
+                for vid, name, url, path, includes, excludes, last_match, active in c.fetchall():
                     try:
                         rss = feedparser.parse(url)
                         if not active:
@@ -53,11 +54,11 @@ class Torrent:
                                 continue
 
                             if is_match(rss['entries'][y]['title'], includes, excludes):
-                                self.c.execute(
+                                c.execute(
                                     'INSERT INTO torrent_queue(name, url, path) VALUES(?, ?, ?)',
                                     (rss['entries'][y]['title'], rss['entries'][y]['link'], path))
 
-                                self.c.execute('UPDATE torrent_subscriptions SET last_match = ? WHERE ID = ?',
+                                c.execute('UPDATE torrent_subscriptions SET last_match = ? WHERE ID = ?',
                                                (rss['entries'][y]['link'], vid))
                                 self.conn.commit()
 
@@ -72,10 +73,11 @@ class Torrent:
             time.sleep(settings.crawler_time_out)
 
     def deluge_crawler(self):
+        c = self.conn.cursor()
         logger.info("Torrent Plugin : Deluge Crawler Started")
         while True:
-            self.c.execute("SELECT id,url FROM torrent_queue")
-            for tid, link in self.c.fetchall():
+            c.execute("SELECT id,url FROM torrent_queue")
+            for tid, link in c.fetchall():
                 torrent_id = re.search(r'\b([A-F\d]+)\b', link).group()
                 data = shell_exe('deluge-console info').strip().split('\n')
 
@@ -86,7 +88,7 @@ class Torrent:
                             downloaded_size = round(int(data[idx + 1].strip(' ')[1]) * 1048576)
                             total_size = round(int(data[idx + 1].strip(' ')[2].strip('MiB/')) * 1048576)
 
-                            self.c.execute(
+                            c.execute(
                                 'UPDATE torrent_queue SET state = ?, downloaded_bytes = ?, total_bytes = ? WHERE ID = ?',
                                 (torrent_state, downloaded_size, total_size, tid))
                             self.conn.commit()
@@ -97,18 +99,19 @@ class Torrent:
                 time.sleep(settings.crawler_time_out)
 
     def downloader(self):
+        c = self.conn.cursor()
         logger.info("Youtube Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)
                 continue
 
-                self.c.execute("SELECT id, name, url, path FROM torrent_queue")
-                for ID, name, url, path in self.c.fetchall():
+                c.execute("SELECT id, name, url, path FROM torrent_queue")
+                for ID, name, url, path in c.fetchall():
                     data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
 
                     if 'Torrent added!\n' in data:
-                        self.c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
+                        c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
                                        (datetime.datetime.now(), ID))
                         self.conn.commit()
                     else:

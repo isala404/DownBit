@@ -29,14 +29,16 @@ for plugin in os.listdir('plugins'):
         logger.error("Couldn't Load Plugin {}".format(plugin))
         logger.exception(e)
 
-
+threads = []
 for plugin in plugins:
     try:
         crawler = threading.Thread(target=plugin.crawler)
         crawler.start()
+        threads.append(crawler)
 
         downloader = threading.Thread(target=plugin.downloader)
         downloader.start()
+        threads.append(downloader)
 
     except Exception as e:
         logger.exception(e)
@@ -45,9 +47,17 @@ if not is_downloading_time:
     logger.info("All the Downloaders are Paused till the Downloading Hours")
 
 while True:
-    if str(datetime.datetime.now().strftime('%H:%M')) == '08:00':
-        # TODO: Send Email
-        pass
-        time.sleep(120)
+    try:
+        if str(datetime.datetime.now().strftime('%H:%M')) == '08:00':
+            # TODO: Send Email
+            pass
+            time.sleep(120)
 
-    time.sleep(20)
+        time.sleep(20)
+    except KeyboardInterrupt:
+        logger.warning("KeyboardInterrupt Stopping DownBit")
+        logger.info("##########################################################")
+        logger.info("################### Terminating ##########################")
+        logger.info("##########################################################")
+        break
+
