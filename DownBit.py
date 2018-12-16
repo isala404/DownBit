@@ -3,6 +3,7 @@ import datetime
 import os
 import logging.handlers
 import logging
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -115,4 +116,8 @@ def create_logger(name, path='logs', save_log=0, log_level='Debug'):
 
 
 def is_downloading_time():
-    return True
+    time = int(datetime.datetime.now().strftime('%H'))
+    if time in settings.download_hours:
+        return True
+    else:
+        return False

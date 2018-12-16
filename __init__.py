@@ -1,6 +1,8 @@
-from DownBit import create_logger
+from DownBit import create_logger, is_downloading_time
 import os
 import threading
+import datetime
+import time
 
 logger = create_logger('DownBit', path='logs', save_log=5, log_level='Debug')
 
@@ -27,21 +29,25 @@ for plugin in os.listdir('plugins'):
         logger.error("Couldn't Load Plugin {}".format(plugin))
         logger.exception(e)
 
-threads = []
+
 for plugin in plugins:
     try:
         crawler = threading.Thread(target=plugin.crawler)
-        threads.append(crawler)
         crawler.start()
 
         downloader = threading.Thread(target=plugin.downloader)
-        threads.append(downloader)
         downloader.start()
 
     except Exception as e:
         logger.exception(e)
 
-for threads in threads:
-    threads.join()
+if not is_downloading_time:
+    logger.info("All the Downloaders are Paused till the Downloading Hours")
 
-logger.error("All the Threads has existed")
+while True:
+    if str(datetime.datetime.now().strftime('%H:%M')) == '08:00':
+        # TODO: Send Email
+        pass
+        time.sleep(120)
+
+    time.sleep(20)
