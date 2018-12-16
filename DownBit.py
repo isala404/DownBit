@@ -72,12 +72,12 @@ def safe_filename(name):
 
 
 def shell_exe(cmd):
-    logger.debug('executing cmd - ' + cmd)
+    # logger.debug('executing cmd - ' + cmd)
     try:
         f = os.popen(cmd)
         out = f.read()
-        for line in out.split("\n"):
-            logger.debug("output " + line)
+        # for line in out.split("\n"):
+        #     logger.debug("output " + line)
         return out
     except Exception as e:
         logger.exception(e)
