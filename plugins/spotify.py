@@ -49,7 +49,8 @@ class Spotify:
                 while True:
                     feedback = self.update_table(results, offset)
                     if not results['next'] or not feedback:
-                        break
+                        logger.info("Spotify Plugin : Database is Up to Date Exiting Crawler")
+                        return False
                     results = sp.next(results)
 
             except Exception as e:
