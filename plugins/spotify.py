@@ -36,7 +36,7 @@ class Spotify:
         logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
-                c.execute("SELECT track_id FROM spotify_queue ORDER BY id DESC LIMIT 1")
+                c.execute("SELECT track_id FROM spotify_queue")
                 offset = c.fetchall()
 
                 if not spotify_token:
@@ -64,7 +64,7 @@ class Spotify:
         for item in tracks['items']:
             track = item['track']
             if offset:
-                logger.debug("{}, {}, {}".format(track['id'], offset[0][0], offset[-1][0]))
+                # logger.debug("{}, {}, {}".format(track['id'], offset[0][0], offset[-1][0]))
                 if track['id'] == offset[0][0] or track['id'] == offset[-1][0]:
                     return False
 
