@@ -64,7 +64,8 @@ class Spotify:
         for item in tracks['items']:
             track = item['track']
             if offset:
-                if track['id'] == offset[0][1] or track['id'] == offset[-1][1]:
+                logger.debug("{}, {}, {}".format(track['id'], offset[0][0], offset[-1][0]))
+                if track['id'] == offset[0][0] or track['id'] == offset[-1][0]:
                     return False
 
             # noinspection SpellCheckingInspection
