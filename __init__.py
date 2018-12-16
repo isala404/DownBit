@@ -45,6 +45,8 @@ for plugin in plugins:
 
 if not is_downloading_time:
     logger.info("All the Downloaders are Paused till the Downloading Hours")
+else:
+    logger.info("All the Downloaders are Running")
 
 while True:
     try:
