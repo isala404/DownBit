@@ -3,6 +3,8 @@ import datetime
 import os
 import logging.handlers
 import logging
+import sqlite3
+
 import settings
 
 logger = logging.getLogger(__name__)
@@ -106,12 +108,14 @@ def create_logger(name, path='logs', save_log=0, log_level='Debug'):
         log.setLevel(20)
 
     file_handler = logging.handlers.RotatingFileHandler(file_name, backupCount=save_log)
-
+    file_handler.doRollover()
     file_handler.setFormatter(formatter)
     log.addHandler(file_handler)
+
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     log.addHandler(console_handler)
+
     return log
 
 
@@ -121,3 +125,35 @@ def is_downloading_time():
         return True
     else:
         return False
+
+
+class Storage(object):
+    def __init__(self):
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        self.conn = sqlite3.connect('database.db')
+        self.c = self.conn.cursor()
+
+    def read(self, query, pars=None, read_one=False):
+        logger.debug("Reading Data --> {} - {}".format(query, pars))
+        try:
+            if pars:
+                self.c.execute(query, pars)
+            else:
+                self.c.execute(query)
+            if read_one:
+                return self.c.fetchone()
+            else:
+                return self.c.fetchall()
+        except Exception as e:
+            logger.exception(e)
+
+    def write(self, query, pars=None):
+        logger.debug("Writing Data --> {} - {}".format(query, pars))
+        try:
+            if pars:
+                self.c.execute(query, pars)
+            else:
+                self.c.execute(query)
+            self.conn.commit()
+        except Exception as e:
+            logger.exception(e)
