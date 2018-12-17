@@ -36,8 +36,6 @@ class Spotify:
         logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
-                c.execute("SELECT track_id FROM spotify_queue")
-                offset = c.fetchall()
 
                 if not spotify_token:
                     logger.warning("Spotify Token is Empty, Fill the Token to Continue")
@@ -47,7 +45,7 @@ class Spotify:
                 results = sp.current_user_saved_tracks()
 
                 while True:
-                    feedback = self.update_table(results, offset)
+                    feedback = self.update_table(results)
                     if not results['next'] or not feedback:
                         logger.info("Spotify Plugin : Database is Up to Date Exiting Crawler")
                         return False
@@ -59,14 +57,14 @@ class Spotify:
 
             time.sleep(settings.crawler_time_out)
 
-    def update_table(self, tracks, offset):
+    def update_table(self, tracks):
         c = self.conn.cursor()
         for item in tracks['items']:
             track = item['track']
+            c.execute("SELECT id FROM spotify_queue WHERE track_id = ?", (track['id'],))
+            offset = c.fetchall()
             if offset:
-                # logger.debug("{}, {}, {}".format(track['id'], offset[0][0], offset[-1][0]))
-                if track['id'] == offset[0][0] or track['id'] == offset[-1][0]:
-                    return False
+                return False
 
             # noinspection SpellCheckingInspection
             ydl_opts = {
@@ -93,15 +91,15 @@ class Spotify:
 
                 c.execute('''INSERT INTO spotify_queue(track_id, track_name, artist_name, album_name,
                  album_artist, image, url, release_date, total_bytes) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                               (track['id'],
-                                track['name'],
-                                track['artists'][0]['name'],
-                                track['album']['name'],
-                                track['album']['artists'][0]['name'],
-                                track['album']['images'][0]['url'],
-                                data['entries'][0]['webpage_url'],
-                                track['album']['release_date'],
-                                file_size))
+                          (track['id'],
+                           track['name'],
+                           track['artists'][0]['name'],
+                           track['album']['name'],
+                           track['album']['artists'][0]['name'],
+                           track['album']['images'][0]['url'],
+                           data['entries'][0]['webpage_url'],
+                           track['album']['release_date'],
+                           file_size))
 
                 self.conn.commit()
             except Exception as e:
@@ -177,7 +175,8 @@ class Spotify:
                 except Exception as e:
                     logger.error("Error While Downloading a song")
                     logger.error(
-                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name, album_artist,
+                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name,
+                                                                    album_artist,
                                                                     image, url, album_artist, release_date))
                     c.execute("UPDATE `spotify_queue` SET completed_time=null WHERE id=?", (self.current_vid,))
                     self.conn.commit()
@@ -198,14 +197,14 @@ class Spotify:
 
             if total_bytes:
                 c.execute("UPDATE `spotify_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
-                               (downloaded_bytes, total_bytes, self.current_vid))
+                          (downloaded_bytes, total_bytes, self.current_vid))
                 self.conn.commit()
             else:
                 c.execute("UPDATE `spotify_queue` SET downloaded_bytes=? WHERE id=?",
-                               (downloaded_bytes, self.current_vid))
+                          (downloaded_bytes, self.current_vid))
                 self.conn.commit()
 
         elif progress['status'] == 'finished':
             c.execute("UPDATE `spotify_queue` SET completed_time=? WHERE id=?",
-                           (datetime.datetime.now(), self.current_vid))
+                      (datetime.datetime.now(), self.current_vid))
             self.conn.commit()
