@@ -1,7 +1,6 @@
 import youtube_dl
 from DownBit import *
 import spotipy
-import sqlite3
 import eyed3
 from urllib.request import urlretrieve as download
 from settings import spotify_token, song_download_path
@@ -15,24 +14,21 @@ eyed3.log.setLevel("ERROR")
 
 
 class Spotify:
-    def __init__(self):
+    def __init__(self, db):
         logger.info("Spotify Plugin : Loaded")
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        # Connecting to Database
-        self.conn = sqlite3.connect('../database.db', check_same_thread=False)
-        c = self.conn.cursor()
 
-        c.execute('''CREATE TABLE IF NOT EXISTS `spotify_queue` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `track_id` TEXT UNIQUE,
+        db.write('''CREATE TABLE IF NOT EXISTS `spotify_queue` ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `track_id` TEXT UNIQUE,
         `track_name` TEXT, `artist_name` TEXT, `album_name` TEXT, `album_artist` TEXT, `image` TEXT, `url` TEXT,
         `release_date` TIMESTAMP, `added_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP,
         `downloaded_bytes` INTEGER DEFAULT -1, `total_bytes` INTEGER DEFAULT -1, 
         UNIQUE(`track_name`, `artist_name`) ON CONFLICT REPLACE )''')
 
-        self.conn.commit()
+        self.db = db
+
         self.current_vid = None
 
     def crawler(self):
-        c = self.conn.cursor()
         logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
@@ -54,16 +50,18 @@ class Spotify:
             except Exception as e:
                 logger.critical("Critical Error While Phrasing Spotify Feed")
                 logger.exception(e)
+                logger.info("Spotify Plugin : Exiting Crawler")
+                break
 
+            # noinspection PyUnreachableCode
             time.sleep(settings.crawler_time_out)
 
     def update_table(self, tracks):
-        c = self.conn.cursor()
+
         for item in tracks['items']:
             track = item['track']
-            c.execute("SELECT id FROM spotify_queue WHERE track_id = ?", (track['id'],))
-            offset = c.fetchall()
-            if offset:
+
+            if self.db.read("SELECT id FROM spotify_queue WHERE track_id = ?", (track['id'],)):
                 return False
 
             # noinspection SpellCheckingInspection
@@ -89,19 +87,12 @@ class Spotify:
                 if 'filesize' in data['entries'][0]:
                     file_size = data['entries'][0]['filesize']
 
-                c.execute('''INSERT INTO spotify_queue(track_id, track_name, artist_name, album_name,
+                self.db.write('''INSERT INTO spotify_queue(track_id, track_name, artist_name, album_name,
                  album_artist, image, url, release_date, total_bytes) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                               (track['id'],
-                                track['name'],
-                                track['artists'][0]['name'],
-                                track['album']['name'],
-                                track['album']['artists'][0]['name'],
-                                track['album']['images'][0]['url'],
-                                data['entries'][0]['webpage_url'],
-                                track['album']['release_date'],
-                                file_size))
+                              (track['id'], track['name'], track['artists'][0]['name'], track['album']['name'],
+                               track['album']['artists'][0]['name'], track['album']['images'][0]['url'],
+                               data['entries'][0]['webpage_url'],track['album']['release_date'], file_size))
 
-                self.conn.commit()
             except Exception as e:
                 logger.error(
                     "Error While Crawling for '{} {} lyrics'".format(track['artists'][0]['name'], track['name']))
@@ -111,7 +102,6 @@ class Spotify:
         return True
 
     def downloader(self):
-        c = self.conn.cursor()
         logger.info("Spotify Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
@@ -120,7 +110,8 @@ class Spotify:
 
             if not os.path.exists(song_download_path):
                 os.makedirs(song_download_path)
-            c.execute(
+
+            self.db.read(
                 "SELECT id, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date FROM spotify_queue WHERE completed_time IS NULL ")
             for vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date in c.fetchall():
                 try:
@@ -175,16 +166,15 @@ class Spotify:
                 except Exception as e:
                     logger.error("Error While Downloading a song")
                     logger.error(
-                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name, album_artist,
+                        '{}, {}, {}, {}, {}, {}, {}, {}, {}'.format(vid, track_name, artist_name, album_name,
+                                                                    album_artist,
                                                                     image, url, album_artist, release_date))
-                    c.execute("UPDATE `spotify_queue` SET completed_time=null WHERE id=?", (self.current_vid,))
-                    self.conn.commit()
                     logger.exception(e)
 
                 time.sleep(settings.downloader_time_out)
 
     def youtube_progress_hook(self, progress):
-        c = self.conn.cursor()
+
         if progress['status'] == 'downloading':
             downloaded_bytes = progress['downloaded_bytes']
             total_bytes = None
@@ -195,15 +185,13 @@ class Spotify:
                 total_bytes = progress['total_bytes_estimate']
 
             if total_bytes:
-                c.execute("UPDATE `spotify_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
-                               (downloaded_bytes, total_bytes, self.current_vid))
-                self.conn.commit()
+                self.db.write("UPDATE `spotify_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
+                              (downloaded_bytes, total_bytes, self.current_vid))
+
             else:
-                c.execute("UPDATE `spotify_queue` SET downloaded_bytes=? WHERE id=?",
-                               (downloaded_bytes, self.current_vid))
-                self.conn.commit()
+                self.db.write("UPDATE `spotify_queue` SET downloaded_bytes=? WHERE id=?",
+                              (downloaded_bytes, self.current_vid))
 
         elif progress['status'] == 'finished':
-            c.execute("UPDATE `spotify_queue` SET completed_time=? WHERE id=?",
-                           (datetime.datetime.now(), self.current_vid))
-            self.conn.commit()
+            self.db.write("UPDATE `spotify_queue` SET completed_time=? WHERE id=?",
+                          (datetime.datetime.now(), self.current_vid))

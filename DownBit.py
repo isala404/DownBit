@@ -3,6 +3,8 @@ import datetime
 import os
 import logging.handlers
 import logging
+import sqlite3
+
 import settings
 
 logger = logging.getLogger(__name__)
@@ -121,3 +123,35 @@ def is_downloading_time():
         return True
     else:
         return False
+
+
+class Storage(object):
+    def __init__(self):
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        self.conn = sqlite3.connect('database.db')
+        self.c = self.conn.cursor()
+
+    def read(self, query, pars=None, read_one=False):
+        logger.debug("Reading Data --> {} - {}".format(query, pars))
+        try:
+            if pars:
+                self.c.execute(query, pars)
+            else:
+                self.c.execute(query)
+            if read_one:
+                return self.c.fetchone()
+            else:
+                return self.c.fetchall()
+        except Exception as e:
+            logger.exception(e)
+
+    def write(self, query, pars=None):
+        logger.debug("Writing Data --> {} - {}".format(query, pars))
+        try:
+            if pars:
+                self.c.execute(query, pars)
+            else:
+                self.c.execute(query)
+            self.conn.commit()
+        except Exception as e:
+            logger.exception(e)
