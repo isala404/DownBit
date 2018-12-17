@@ -1,10 +1,7 @@
 .venv/
-database
 .idea/
 __pycache__
 database-journal
-*.log
-settings.py
+*.log*
 *.old
 *.db
-log*
