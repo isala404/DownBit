@@ -6,3 +6,5 @@ database-journal
 *.log
 settings.py
 *.old
+*.db
+*.log*

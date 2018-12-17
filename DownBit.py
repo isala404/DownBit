@@ -106,12 +106,14 @@ def create_logger(name, path='logs', save_log=0, log_level='Debug'):
         log.setLevel(20)
 
     file_handler = logging.handlers.RotatingFileHandler(file_name, backupCount=save_log)
-
+    file_handler.doRollover()
     file_handler.setFormatter(formatter)
     log.addHandler(file_handler)
+
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     log.addHandler(console_handler)
+
     return log
 
 
