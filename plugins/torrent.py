@@ -106,7 +106,7 @@ class Torrent:
                 time.sleep(2)
                 continue
 
-                c.execute("SELECT id, name, url, path FROM torrent_queue")
+                c.execute("SELECT id, name, url, path FROM torrent_queue WHERE completed_time IS NULL")
                 for ID, name, url, path in c.fetchall():
                     data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
 

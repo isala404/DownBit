@@ -111,7 +111,7 @@ class Youtube:
                 time.sleep(2)
                 continue
 
-            c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue")
+            c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue WHERE completed_time IS NULL")
             for vid, name, url, quality, path, is_playlist in c.fetchall():
                 self.current_vid = vid
                 if not is_playlist:
