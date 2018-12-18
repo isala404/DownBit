@@ -3,6 +3,7 @@ from DownBit import *
 import feedparser
 import os
 import datetime
+import sqlite3
 import settings
 import logging
 import time
@@ -12,30 +13,35 @@ logger = logging.getLogger(__name__)
 
 class Youtube:
 
-    def __init__(self, db):
+    def __init__(self):
         logger.info("Youtube Plugin : Loaded")
-
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        # Connecting to Database
+        self.conn = sqlite3.connect('../database.db', check_same_thread=False)
+        c = self.conn.cursor()
         self.current_vid = None
 
         # Create Tables for Plugins supported by default if they are not present
-        self.db = db
 
-        self.db.write('''CREATE TABLE IF NOT EXISTS "youtube_subscriptions" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
+        c.execute('''CREATE TABLE IF NOT EXISTS "youtube_subscriptions" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
         `url` TEXT DEFAULT 'https://www.youtube.com/feeds/videos.xml?channel_id=' UNIQUE, `quality` TEXT DEFAULT 
         '720p', `path` TEXT, `includes` TEXT, `excludes` TEXT, `last_match` TEXT, `active` NUMERIC DEFAULT 1 )''')
 
-        self.db.write('''CREATE TABLE IF NOT EXISTS "youtube_queue" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
+        c.execute('''CREATE TABLE IF NOT EXISTS "youtube_queue" ( `id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT, 
         `url` TEXT UNIQUE, `path` TEXT DEFAULT '/mnt/Youtube/', `quality` TEXT DEFAULT '720p', `added_time` TIMESTAMP 
         DEFAULT CURRENT_TIMESTAMP, `completed_time` TIMESTAMP, `downloaded_bytes` INTEGER DEFAULT 0, `total_bytes` 
         INTEGER DEFAULT -1, `is_playlist` NUMERIC DEFAULT 0, `playlist_start` INTEGER DEFAULT 0, 
         `playlist_end` INTEGER DEFAULT -1 )''')
 
+        self.conn.commit()
+
     def crawler(self):
+        c = self.conn.cursor()
         logger.info("Youtube Plugin : Crawler Started")
         while True:
             try:
-                for vid, name, url, quality, path, includes, excludes, last_match, active in self.db.read(
-                        "SELECT * FROM youtube_subscriptions"):
+                c.execute("SELECT * FROM youtube_subscriptions")
+                for vid, name, url, quality, path, includes, excludes, last_match, active in c.fetchall():
                     try:
                         if not active:
                             logger.debug("Skipping #{} {}".format(vid, name.strip()))
@@ -79,12 +85,13 @@ class Youtube:
                                 if not path:
                                     path = "{}{}".format(settings.youtube_download_path, date())
 
-                                self.db.write(
+                                c.execute(
                                     'INSERT INTO youtube_queue(name, url, path, quality, total_bytes) VALUES(?, ?, ?, ?, ?)',
                                     (rss['entries'][y]['title'], rss['entries'][y]['link'], path, quality, file_size))
 
-                                self.db.write('UPDATE youtube_subscriptions SET last_match = ? WHERE ID = ?',
-                                              (rss['entries'][y]['link'], vid))
+                                c.execute('UPDATE youtube_subscriptions SET last_match = ? WHERE ID = ?',
+                                               (rss['entries'][y]['link'], vid))
+                                self.conn.commit()
 
                     except Exception as e:
                         logger.error("Error while Processing RSS feed of {}[{}]".format(url, vid))
@@ -97,14 +104,15 @@ class Youtube:
             time.sleep(settings.crawler_time_out)
 
     def downloader(self):
+        c = self.conn.cursor()
         logger.info("Youtube Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)
                 continue
 
-            for vid, name, url, quality, path, is_playlist in self.db.read(
-                    "SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue"):
+            c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue")
+            for vid, name, url, quality, path, is_playlist in c.fetchall():
                 self.current_vid = vid
                 if not is_playlist:
                     if not os.path.exists(path):
@@ -127,7 +135,7 @@ class Youtube:
             time.sleep(settings.downloader_time_out)
 
     def youtube_progress_hook(self, progress):
-
+        c = self.conn.cursor()
         if progress['status'] == 'downloading':
             downloaded_bytes = progress['downloaded_bytes']
             total_bytes = None
@@ -138,13 +146,15 @@ class Youtube:
                 total_bytes = progress['total_bytes_estimate']
 
             if total_bytes:
-                self.db.write("UPDATE `youtube_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
-                              (downloaded_bytes, total_bytes, self.current_vid))
-
+                c.execute("UPDATE `youtube_queue` SET downloaded_bytes=?, total_bytes=? WHERE id=?",
+                               (downloaded_bytes, total_bytes, self.current_vid))
+                self.conn.commit()
             else:
-                self.db.write("UPDATE `youtube_queue` SET downloaded_bytes=? WHERE id=?",
-                              (downloaded_bytes, self.current_vid))
+                c.execute("UPDATE `youtube_queue` SET downloaded_bytes=? WHERE id=?",
+                               (downloaded_bytes, self.current_vid))
+                self.conn.commit()
 
         elif progress['status'] == 'finished':
-            self.db.write("UPDATE `youtube_queue` SET completed_time=? WHERE id=?",
-                          (datetime.datetime.now(), self.current_vid))
+            c.execute("UPDATE `youtube_queue` SET completed_time=? WHERE id=?",
+                           (datetime.datetime.now(), self.current_vid))
+            self.conn.commit()
