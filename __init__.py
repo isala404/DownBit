@@ -1,12 +1,10 @@
-from DownBit import create_logger, is_downloading_time, Storage
+from DownBit import create_logger, is_downloading_time
 import os
 import threading
 import datetime
 import time
 
 logger = create_logger('DownBit', path='logs', save_log=5, log_level='Debug')
-
-DB = Storage()
 
 
 plugins = []
@@ -21,7 +19,7 @@ for plugin in os.listdir('plugins'):
         logger.info("Loading {} Plugin".format(plugin.title()))
         module = __import__('plugins.' + plugin, fromlist=["*"])
         my_class = getattr(module, dir(module)[0])
-        instance = my_class(DB)
+        instance = my_class()
         if 'crawler' in dir(instance) and 'downloader' in dir(instance):
             plugins.append(instance)
         else:
