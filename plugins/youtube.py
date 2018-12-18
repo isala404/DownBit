@@ -113,24 +113,28 @@ class Youtube:
 
             c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue WHERE completed_time IS NULL")
             for vid, name, url, quality, path, is_playlist in c.fetchall():
-                self.current_vid = vid
-                if not is_playlist:
-                    if not os.path.exists(path):
-                        os.mkdir(path)
+                try:
                     self.current_vid = vid
-                    ydl_opts = {
-                        'format': get_quality(quality),
-                        'outtmpl': '{}/%(uploader)s-%(title)s[%(id)s].%(ext)s'.format(path.rstrip('/')),
-                        'logger': logger,
-                        'continuedl': True,
-                        'source_address': '0.0.0.0',
-                        'progress_hooks': [self.youtube_progress_hook],
-                        'noprogress': True
-                    }
+                    if not is_playlist:
+                        if not os.path.exists(path):
+                            os.mkdir(path)
+                        self.current_vid = vid
+                        ydl_opts = {
+                            'format': get_quality(quality),
+                            'outtmpl': '{}/%(uploader)s-%(title)s[%(id)s].%(ext)s'.format(path.rstrip('/')),
+                            'logger': logger,
+                            'continuedl': True,
+                            'source_address': '0.0.0.0',
+                            'progress_hooks': [self.youtube_progress_hook],
+                            'noprogress': True
+                        }
 
-                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url])
-                # TODO: Handle for Playlist
+                        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([url])
+                    # TODO: Handle for Playlist
+                except Exception as e:
+                    logger.exception(e)
+                    continue
 
             time.sleep(settings.downloader_time_out)
 
