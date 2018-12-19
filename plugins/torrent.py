@@ -59,7 +59,7 @@ class Torrent:
                                     (rss['entries'][y]['title'], rss['entries'][y]['link'], path))
 
                                 c.execute('UPDATE torrent_subscriptions SET last_match = ? WHERE ID = ?',
-                                               (rss['entries'][y]['link'], vid))
+                                          (rss['entries'][y]['link'], vid))
                                 self.conn.commit()
 
                     except Exception as e:
@@ -108,11 +108,14 @@ class Torrent:
 
                 c.execute("SELECT id, name, url, path FROM torrent_queue WHERE completed_time IS NULL")
                 for ID, name, url, path in c.fetchall():
+                    if not is_downloading_time():
+                        break
                     data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
 
                     if 'Torrent added!\n' in data:
+                        logger.info("[Torrent] {} was added to deluge queue".format(name))
                         c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
-                                       (datetime.datetime.now(), ID))
+                                  (datetime.datetime.now(), ID))
                         self.conn.commit()
                     else:
                         logger.error("couldn't add the {}[#{}] to deluge".format(name, ID))

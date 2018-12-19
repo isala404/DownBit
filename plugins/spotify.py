@@ -124,6 +124,8 @@ class Spotify:
                 "SELECT id, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date FROM spotify_queue WHERE completed_time IS NULL ")
             for vid, track_name, artist_name, album_name, album_artist, image, url, album_artist, release_date in c.fetchall():
                 try:
+                    if not is_downloading_time():
+                        break
                     self.current_vid = vid
                     # noinspection SpellCheckingInspection
                     ydl_opts = {
@@ -143,6 +145,7 @@ class Spotify:
                         'source_address': '0.0.0.0',
                         'noprogress': True
                     }
+                    logger.info("[Spotify] Downloading {} by {} ({})".format(track_name, artist_name, url))
                     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                         data = ydl.extract_info(url)
                         path = ydl.prepare_filename(data)
@@ -172,6 +175,7 @@ class Spotify:
                     audio_file.tag.release_date = u"{}".format(release_date)
                     audio_file.tag.images.set(3, open(dl_dir, "rb").read(), "image/jpeg", u"")
                     audio_file.tag.save()
+
                 except Exception as e:
                     logger.error("Error While Downloading a song")
                     logger.error(

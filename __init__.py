@@ -1,6 +1,6 @@
 from DownBit import create_logger, is_downloading_time
 import os
-import threading
+from multiprocessing import Process
 import datetime
 import time
 
@@ -33,11 +33,11 @@ for plugin in os.listdir('plugins'):
 threads = []
 for plugin in plugins:
     try:
-        crawler = threading.Thread(target=plugin.crawler)
+        crawler = Process(target=plugin.crawler)
         crawler.start()
         threads.append(crawler)
 
-        downloader = threading.Thread(target=plugin.downloader)
+        downloader = Process(target=plugin.downloader)
         downloader.start()
         threads.append(downloader)
 
@@ -58,6 +58,9 @@ while True:
         time.sleep(20)
     except KeyboardInterrupt:
         logger.warning("KeyboardInterrupt Stopping DownBit")
+        for thread in threads:
+            thread.terminate()
+
         logger.info("##########################################################")
         logger.info("################### Terminating ##########################")
         logger.info("##########################################################")

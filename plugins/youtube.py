@@ -114,6 +114,8 @@ class Youtube:
             c.execute("SELECT id, name, url, quality, path, is_playlist  FROM youtube_queue WHERE completed_time IS NULL")
             for vid, name, url, quality, path, is_playlist in c.fetchall():
                 try:
+                    if not is_downloading_time():
+                        break
                     self.current_vid = vid
                     if not is_playlist:
                         if not os.path.exists(path):
@@ -128,7 +130,7 @@ class Youtube:
                             'progress_hooks': [self.youtube_progress_hook],
                             'noprogress': True
                         }
-
+                        logger.info("[Youtube] Downloading {} ({})".format(name, url))
                         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                             ydl.download([url])
                     # TODO: Handle for Playlist
