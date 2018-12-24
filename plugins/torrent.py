@@ -100,24 +100,24 @@ class Torrent:
 
     def downloader(self):
         c = self.conn.cursor()
-        logger.info("Youtube Plugin : Downloader Started")
+        logger.info("Torrent Plugin : Downloader Started")
         while True:
             if not is_downloading_time():
                 time.sleep(2)
                 continue
 
-                c.execute("SELECT id, name, url, path FROM torrent_queue WHERE completed_time IS NULL")
-                for ID, name, url, path in c.fetchall():
-                    if not is_downloading_time():
-                        break
-                    data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
+            c.execute("SELECT id, name, url, path FROM torrent_queue WHERE completed_time IS NULL")
+            for ID, name, url, path in c.fetchall():
+                if not is_downloading_time():
+                    break
+                data = shell_exe('deluge-console add "{}" -p "{}"'.format(url, path))
 
-                    if 'Torrent added!\n' in data:
-                        logger.info("[Torrent] {} was added to deluge queue".format(name))
-                        c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
-                                  (datetime.datetime.now(), ID))
-                        self.conn.commit()
-                    else:
-                        logger.error("couldn't add the {}[#{}] to deluge".format(name, ID))
+                if 'Torrent added!\n' in data:
+                    logger.info("[Torrent] {} was added to deluge queue".format(name))
+                    c.execute("UPDATE torrent_queue SET completed_time=? WHERE id=?",
+                              (datetime.datetime.now(), ID))
+                    self.conn.commit()
+                else:
+                    logger.error("couldn't add the {}[#{}] to deluge".format(name, ID))
 
                 time.sleep(settings.downloader_time_out)
