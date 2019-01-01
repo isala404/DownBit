@@ -25,6 +25,22 @@ for item in tracks:
 
     ydl_opts = {
         'format': 'bestaudio/best',
+        'default_search': 'auto',
+        'noplaylist': True,
+        'source_address': '0.0.0.0',
+        'nocheckcertificate': True,
+        'ignoreerrors': False,
+        'logtostderr': False,
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        data_ = ydl.extract_info("ytsearch:{} {} audio".format(artist_name, track_name),
+                                 download=False)
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -39,8 +55,7 @@ for item in tracks:
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        data = ydl.extract_info("ytsearch:{} {} audio".format(artist_name, track_name),
-                                download=True)
+        data = ydl.extract_info(data_['entries'][0]['webpage_url'])
         path = ydl.prepare_filename(data)
 
     if not os.path.exists(path):
