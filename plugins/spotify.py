@@ -32,7 +32,6 @@ class Spotify:
         self.current_vid = None
 
     def crawler(self):
-        c = self.conn.cursor()
         logger.info("Spotify Plugin : Crawler Started")
         while True:
             try:
@@ -45,8 +44,8 @@ class Spotify:
                 results = sp.current_user_saved_tracks()
 
                 while True:
-                    feedback = self.update_table(results)
-                    if not results['next'] or not feedback:
+                    self.update_table(results)
+                    if not results['next']:
                         logger.info("Spotify Plugin : Database is Up to Date Exiting Crawler")
                         return False
                     results = sp.next(results)
@@ -64,7 +63,7 @@ class Spotify:
             c.execute("SELECT id FROM spotify_queue WHERE track_id = ?", (track['id'],))
             offset = c.fetchall()
             if offset:
-                return False
+                continue
 
             # noinspection SpellCheckingInspection
             ydl_opts = {
@@ -80,10 +79,10 @@ class Spotify:
             }
 
             file_size = 0
-            logger.debug("Crawling Youtube for '{} {} audio'".format(track['artists'][0]['name'], track['name']))
+            logger.debug("Crawling Youtube for '{} {} lyrics'".format(track['artists'][0]['name'], track['name']))
             try:
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    data = ydl.extract_info("ytsearch:{} {} audio".format(track['artists'][0]['name'], track['name']),
+                    data = ydl.extract_info("ytsearch:{} {} lyrics".format(track['artists'][0]['name'], track['name']),
                                             download=False)
 
                 if 'filesize' in data['entries'][0]:
@@ -107,8 +106,6 @@ class Spotify:
                     "Error While Crawling for '{} {} lyrics'".format(track['artists'][0]['name'], track['name']))
                 logger.exception(e)
                 continue
-
-        return True
 
     def downloader(self):
         c = self.conn.cursor()

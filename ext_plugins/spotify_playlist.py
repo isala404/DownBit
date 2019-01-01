@@ -36,7 +36,7 @@ for item in tracks:
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        data_ = ydl.extract_info("ytsearch:{} {} audio".format(artist_name, track_name),
+        data_ = ydl.extract_info("ytsearch:{} {} lyrics".format(artist_name, track_name),
                                  download=False)
 
     ydl_opts = {
