@@ -37,10 +37,10 @@ for item in tracks:
         'source_address': '0.0.0.0',
         'noprogress': True
     }
-    logger.info("[Spotify Playlist] Downloading {} by {}".format(track_name, artist_name))
+
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         data = ydl.extract_info("ytsearch:{} {} audio".format(artist_name, track_name),
-                                download=False)
+                                download=True)
         path = ydl.prepare_filename(data)
 
     if not os.path.exists(path):
