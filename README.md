@@ -8,7 +8,7 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/mrsupiri?style=social)](https://twitter.com/mrsupiri)
 
 # DownBit
-Automated Youtube and Torrent Downloader for Raspberry Pi which will save you peek time bandwidth 
+DownBit is an automated Youtube and Torrent downloader for Raspberry Pi.This will automatically download youtube videos from your favorite creators during peek off hours which will save you peek time bandwidth
 
 ## Installation
 
